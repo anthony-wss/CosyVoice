@@ -435,7 +435,7 @@ class CosyVoice3Model(CosyVoice2Model):
                                              finalize=finalize)
             tts_mel = tts_mel[:, :, token_offset * self.flow.token_mel_ratio:]
             # append mel cache
-            if self.hift_cache_dict[uuid] is not None:
+            if self.hift_cache_dict.get(uuid) is not None:
                 hift_cache_mel = self.hift_cache_dict[uuid]['mel']
                 tts_mel = torch.concat([hift_cache_mel, tts_mel], dim=2)
                 self.hift_cache_dict[uuid]['mel'] = tts_mel
