@@ -7,6 +7,9 @@ from cosyvoice.utils.file_utils import load_wav
 import whisper
 import numpy as np
 import torch
+import argparse
+import torchaudio
+from datasets import load_from_disk
 
 class CosyVoice3Tokenizer:
     def __init__(self):
@@ -24,8 +27,20 @@ class CosyVoice3Tokenizer:
         self.device = "cuda"
         del configs
     
-    def extract_token(self, path):
-        speech = load_wav(path, 16000)
+    def extract_token(self, path=None, wave=None, sr=None):
+        if path:
+            speech = load_wav(path, 16000)
+        elif wave is not None:
+            # We assume wave shape is [N] here
+            assert sr, "you must provide the sampling rate"
+            speech = torch.from_numpy(wave)
+            if sr != 16000:
+                assert sr >= 16000, f'wav sample rate {sr} must be greater than 16000'
+                speech = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)(speech)
+            speech = speech.view([1, -1])
+        else:
+            raise ValueError("You must provide either path or wave data")
+
         assert speech.shape[1] / 16000 <= 30, 'do not support extract speech token for audio longer than 30s'
         feat = whisper.log_mel_spectrogram(speech, n_mels=128)
         speech_token = self.frontend.speech_tokenizer_session.run(None,
@@ -40,12 +55,26 @@ class CosyVoice3Tokenizer:
 
 def main(args):
     tokenizer = CosyVoice3Tokenizer()
-    speech_token, _ = tokenizer.extract_token("/home/anthony/CosyVoice/zero_shot_0.wav")
-    speech_token = speech_token.tolist()
+    ds = load_from_disk(args.hf_dataset)
 
-    import json
-    with open("speech_tokens.json", "w") as f:
-        json.dump({"speech_token": speech_token}, f)
+    # Debug
+    ds = ds.select(range(5))
+
+    def extract_CV3_token(sample):
+        if "model_res_token_cv3" in sample:
+            return sample
+        model_res_audio = sample["model_res_audio"]
+        speech_token, _ = tokenizer.extract_token(wave=model_res_audio["array"], sr=model_res_audio["sampling_rate"])
+        speech_token = speech_token.tolist()
+        sample["model_res_token_cv3"] = speech_token
+        return sample
+
+    ds = ds.map(extract_CV3_token)
+    # ds.save_to_disk(args.hf_dataset)
+    ds.save_to_disk("_debug_hf_dataset")
 
 if __name__ == "__main__":
-    main({})
+    parser = argparse.ArgumentParser()
+    parser.add_argument("hf_dataset", help="path to the source huggingface dataset", type=str)
+    args = parser.parse_args()
+    main(args)

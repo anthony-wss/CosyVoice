@@ -7,13 +7,15 @@ import uuid
 import torch
 import soundfile as sf
 
-AUDIO_PROMPT_PATH="/home/anthony/CosyVoice/zero_shot_0.wav"
-OUTPUT_PATH="/home/anthony/CosyVoice/output.wav"
+# AUDIO_PROMPT_PATH="/home/anthony/CosyVoice/zero_shot_0.wav"
+# OUTPUT_PATH="/home/anthony/CosyVoice/output.wav"
+AUDIO_PROMPT_PATH="/work/u3937558/seedvc/ref_speech.mp3"
+OUTPUT_PATH="./output.wav"
 
 def main():
     cosyvoice = AutoModel(model_dir='pretrained_models/Fun-CosyVoice3-0.5B')
 
-    with open("speech_tokens.json", "r") as f:
+    with open("speech_tokens_cv3.json", "r") as f:
         speech_token = json.load(f)["speech_token"]
         speech_token = torch.tensor(speech_token)
     flow_prompt_speech_token, _ = cosyvoice.frontend._extract_speech_token(AUDIO_PROMPT_PATH)

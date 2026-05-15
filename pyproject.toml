@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
     "conformer==0.3.2",
+    "datasets>=4.0.0",
     "deepspeed==0.15.1 ; sys_platform == 'linux'",
     "diffusers==0.29.0",
     "fastapi==0.115.6",
@@ -17,6 +18,7 @@ dependencies = [
     "hydra-core==1.3.2",
     "hyperpyyaml==1.2.3",
     "inflect==7.3.1",
+    "ipykernel>=7.2.0",
     "librosa==0.10.2",
     "lightning==2.2.4",
     "matplotlib==3.7.5",
@@ -37,25 +39,12 @@ dependencies = [
     "soundfile==0.12.1",
     "tensorboard==2.14.0",
     "tensorrt>=10.16.1.11",
-    "torch==2.3.1",
-    "torchaudio==2.3.1",
+    "torch==2.10",
+    "torchaudio==2.10",
+    "torchcodec==0.10",
     "transformers==4.51.3",
     "uvicorn==0.30.0",
     "wetext==0.0.4",
     "wget==3.2",
     "x-transformers==2.11.24",
 ]
-
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
-
-[[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchaudio = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
