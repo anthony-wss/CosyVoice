@@ -1,3 +1,8 @@
+_debug_hf_dataset*/
+_VA400k_49k_subset/
+logs/
+wandb/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
