@@ -2,6 +2,7 @@ _debug_hf_dataset*/
 _VA400k_49k_subset/
 logs/
 wandb/
+_debug_va400k_*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

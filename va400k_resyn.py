@@ -2,25 +2,40 @@ import sys
 sys.path.append('third_party/Matcha-TTS')
 sys.path.append('../WavTokenizer')
 import argparse
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk, concatenate_datasets
 from extract_speech_token import CosyVoice3Tokenizer
 from cosyvoice.cli.cosyvoice import AutoModel
 import uuid
 import torch
-
-from encoder.utils import convert_audio
-import torchaudio
+import os
+import math
 from decoder.pretrained import WavTokenizer
 
 AUDIO_PROMPT_PATH="/work/u3937558/seedvc/ref_speech.mp3"
+N_GPU = 8
+CHUNK_SIZE = 500
 
 def main(args):
+    rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(rank)
+    print(f"rank {rank} worker loading")
     ds = load_dataset(args.source_dataset)
     ds = ds["train"]
 
     if args.n != -1:
         assert 1 <= args.n and args.n <= len(ds)
         ds = ds.select(range(args.n))
+    ds = ds.shard(num_shards=N_GPU, index=rank)
+
+    total_samples = len(ds)
+    chunk_size = CHUNK_SIZE
+    num_chunks = math.ceil(total_samples / chunk_size)
+
+    temp_dir = f"_debug_va400k_resyn_tmp_chunks_npug_{N_GPU}_rank{rank}"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    processed_chunks = []
+    print(f"Total samples for rank {rank}: {total_samples}. Divided into {num_chunks} chunks.")
     
     cosyvoice1 = AutoModel(model_dir='pretrained_models/CosyVoice-300M')
     flow_prompt_speech_token, _ = cosyvoice1.frontend._extract_speech_token(AUDIO_PROMPT_PATH)
@@ -76,8 +91,34 @@ def main(args):
 
         return sample
     
-    ds = ds.map(change_token)
-    ds.save_to_disk("_debug_va400k_cv3_subset")
+    for i in range(num_chunks):
+        chunk_path = os.path.join(temp_dir, f"chunk_{i}")
+        
+        # 1. Check if chunk is already processed from a previous run
+        if os.path.exists(chunk_path):
+            print(f"Chunk {i+1}/{num_chunks} already exists. Skipping processing.")
+            processed_chunks.append(load_from_disk(chunk_path))
+            continue
+            
+        print(f"Processing chunk {i+1}/{num_chunks}")
+        start_idx = i * chunk_size
+        end_idx = min(start_idx + chunk_size, total_samples)
+        
+        # 2. Select just this chunk from the dataset
+        chunk = ds.select(range(start_idx, end_idx))
+        
+        # 3. Map over the chunk
+        mapped_chunk = chunk.map(change_token)
+        
+        # 4. Save chunk immediately to disk so progress is secured
+        mapped_chunk.save_to_disk(chunk_path)
+        processed_chunks.append(mapped_chunk)
+
+    print("All chunks processed. Concatenating datasets...")
+    result_set = concatenate_datasets(processed_chunks)
+
+    print(f"Saving final merged dataset to _debug_hf_dataset...")
+    result_set.save_to_disk(f"_debug_va400k_cv3_ngpu{N_GPU}_rank{rank}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
